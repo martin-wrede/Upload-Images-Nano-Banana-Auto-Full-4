@@ -123,6 +123,10 @@ async function processNewRecords(env, baseUrl = null) {
 
                 console.log(`📝 Using prompt: "${finalPrompt}"`);
 
+                // Generate App Link for download (define here for scope)
+                const safeEmail = fields.Email ? fields.Email.replace(/[^a-zA-Z0-9]/g, '_') : '';
+                const downloadLink = `${workerUrl}/?email=${fields.Email}`;
+
                 // Process each image
                 for (let i = 0; i < allImages.length; i++) {
                     const imageUrl = allImages[i].url;
@@ -178,8 +182,6 @@ async function processNewRecords(env, baseUrl = null) {
 
                                 // Generate App Link for download
                                 // Format: https://your-app.pages.dev/?email=user@example.com
-                                const safeEmail = fields.Email ? fields.Email.replace(/[^a-zA-Z0-9]/g, '_') : '';
-                                const downloadLink = `${workerUrl}/?email=${fields.Email}`;
                                 airtableFormData.append('downloadLink', downloadLink);
 
                                 airtableFormData.append('uploadColumn', 'Image_Upload2');
