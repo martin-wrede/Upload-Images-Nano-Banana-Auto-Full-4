@@ -213,7 +213,8 @@ async function processNewRecords(env, baseUrl = null) {
                     recordId,
                     email: fields.Email,
                     imagesProcessed: allImages.length,
-                    status: 'success'
+                    status: 'success',
+                    downloadLink: downloadLink // Add link to response for debugging
                 });
 
                 console.log(`✅ Successfully processed record ${recordId}`);

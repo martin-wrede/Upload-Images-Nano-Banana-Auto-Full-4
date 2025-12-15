@@ -272,6 +272,11 @@ function AdminAutomation() {
                                                 : `❌ ${detail.reason || 'Processing failed'}`
                                             }
                                         </div>
+                                        {detail.downloadLink && (
+                                            <div style={{ marginTop: '0.25rem', fontSize: '0.8rem' }}>
+                                                🔗 <a href={detail.downloadLink} target="_blank" rel="noopener noreferrer">{detail.downloadLink}</a>
+                                            </div>
+                                        )}
                                     </div>
                                 ))}
                             </div>
