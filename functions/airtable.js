@@ -116,6 +116,8 @@ export async function onRequest({ request, env }) {
     }
 
     console.log("Saving to Airtable with fields:", JSON.stringify(fields, null, 2));
+    console.log("Debug - Download Link:", downloadLink);
+    console.log("Debug - Fields Object:", JSON.stringify(fields));
 
     if (!imageUrl) {
       return new Response(JSON.stringify({ error: "Missing imageUrl" }), {
