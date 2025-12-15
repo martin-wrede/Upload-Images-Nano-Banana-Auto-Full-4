@@ -171,6 +171,7 @@ async function processNewRecords(env, baseUrl = null) {
                                 airtableFormData.append('imageUrl', firstImageUrl);
                                 airtableFormData.append('user', fields.User || 'Automated');
                                 airtableFormData.append('email', fields.Email || '');
+                                const orderPackage = fields.Order_Package || '';
                                 if (orderPackage) {
                                     airtableFormData.append('orderPackage', orderPackage);
                                 }
