@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 
 // test
+
 const PACKAGES = {
   test: { title: 'Test Package', limit: 2, description: 'Please upload 2 test images.', column: 'Image_Upload' },
   starter: { title: 'Starter Package', limit: 3, description: 'Please upload 3 images.', column: 'Image_Upload2' },
@@ -20,6 +21,7 @@ function App() {
   const [batchProcessing, setBatchProcessing] = useState(false);
   const [batchProgress, setBatchProgress] = useState({ current: 0, total: 0 });
   const [batchResults, setBatchResults] = useState([]);
+  const [remoteImages, setRemoteImages] = useState([]); // New state for gallery
 
   // Get package and email from URL query parameter
   const queryParams = new URLSearchParams(window.location.search);
@@ -56,6 +58,9 @@ function App() {
         alert('No images found in your folder. Please upload images first.');
         return;
       }
+
+      // Set remote images for gallery display immediately
+      setRemoteImages(data.images);
 
       // Convert R2 images to File objects
       const filePromises = data.images.map(async (img) => {
@@ -301,6 +306,68 @@ function App() {
           </p>
         )}
       </div>
+
+      {/* Gallery Section */}
+      {remoteImages.length > 0 && (
+        <div style={{ marginBottom: '2rem', border: '2px solid #2196F3', padding: '1rem', borderRadius: '8px', backgroundColor: '#E3F2FD' }}>
+          <h3 style={{ marginTop: 0, color: '#1565C0' }}>🖼️ Your Gallery</h3>
+          <p style={{ fontSize: '0.9rem', color: '#555' }}>
+            Found {remoteImages.length} images. You can download them below or select one to modify with AI.
+          </p>
+
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))',
+            gap: '1rem',
+            marginTop: '1rem'
+          }}>
+            {remoteImages.map((img, index) => (
+              <div key={index} style={{
+                backgroundColor: 'white',
+                padding: '0.5rem',
+                borderRadius: '4px',
+                boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                display: 'flex',
+                flexDirection: 'column'
+              }}>
+                <div style={{
+                  height: '120px',
+                  backgroundImage: `url(${img.url})`,
+                  backgroundSize: 'cover',
+                  backgroundPosition: 'center',
+                  borderRadius: '4px',
+                  marginBottom: '0.5rem'
+                }} />
+
+                <div style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                  <span style={{ fontSize: '0.75rem', color: '#666', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {img.filename}
+                  </span>
+
+                  <a
+                    href={img.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{
+                      display: 'block',
+                      textAlign: 'center',
+                      backgroundColor: '#2196F3',
+                      color: 'white',
+                      textDecoration: 'none',
+                      padding: '0.25rem 0.5rem',
+                      borderRadius: '4px',
+                      fontSize: '0.8rem',
+                      fontWeight: 'bold'
+                    }}
+                  >
+                    ⬇️ Download
+                  </a>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/** AI image gneration starts here */}
       {/**  */}
