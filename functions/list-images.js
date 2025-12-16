@@ -55,7 +55,7 @@ export async function onRequest({ request, env }) {
             })
             .map(obj => ({
                 key: obj.key,
-                url: `${env.R2_PUBLIC_URL}/${obj.key}`,
+                url: `${env.R2_PUBLIC_URL || 'https://pub-2e08632872a645f89f91aad5f2904c70.r2.dev'}/${obj.key}`,
                 filename: obj.key.split('/').pop(), // Get filename from key
                 size: obj.size,
                 uploaded: obj.uploaded,
