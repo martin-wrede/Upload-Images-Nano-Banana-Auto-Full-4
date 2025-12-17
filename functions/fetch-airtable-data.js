@@ -30,8 +30,15 @@ export async function onRequest({ request, env }) {
             }
         }
 
+        // Build Airtable URL for the second table (use fallbacks and encode table name)
+        const baseId = env.AIRTABLE_BASE_ID1 || env.AIRTABLE_BASE_ID || env.AIRTABLE_BASE_ID2;
+        const tableNameRaw = env.AIRTABLE_TABLE_NAME1 || env.AIRTABLE_TABLE_NAME || env.AIRTABLE_TABLE_NAME2;
+        const tableName = encodeURIComponent(tableNameRaw || '');
+        if (!baseId || !tableNameRaw) {
+            console.warn('Airtable base/table env not set as expected.', { baseId, tableNameRaw });
+        }
         // Build Airtable URL for the second table
-        const airtableUrl = `https://api.airtable.com/v0/${env.AIRTABLE_BASE_ID1}/${env.AIRTABLE_TABLE_NAME1}`;
+        const airtableUrl = `https://api.airtable.com/v0/${baseId}/${tableName}`;
 
         // Build filter formula if email filter is provided
         let url = airtableUrl;

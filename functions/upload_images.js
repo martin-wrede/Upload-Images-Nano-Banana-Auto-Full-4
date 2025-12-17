@@ -23,7 +23,13 @@ export async function onRequest({ request, env }) {
         const uploadColumn = formData.get('uploadColumn') || 'Image_Upload2'; // Default to Image_Upload2
         const files = formData.getAll('images');
 
-        const airtableUrl = `https://api.airtable.com/v0/${env.AIRTABLE_BASE_ID}/${env.AIRTABLE_TABLE_NAME}`;
+        const baseId = env.AIRTABLE_BASE_ID || env.AIRTABLE_BASE_ID1 || env.AIRTABLE_BASE_ID2;
+        const tableNameRaw = env.AIRTABLE_TABLE_NAME || env.AIRTABLE_TABLE_NAME1 || env.AIRTABLE_TABLE_NAME2;
+        const tableName = encodeURIComponent(tableNameRaw || '');
+        if (!baseId || !tableNameRaw) {
+            console.warn('Airtable base/table env not set as expected.', { baseId, tableNameRaw });
+        }
+        const airtableUrl = `https://api.airtable.com/v0/${baseId}/${tableName}`;
         let pendingRecordId = null;
 
         // Check for pending record (Test uploaded, Paid empty)
@@ -39,22 +45,27 @@ export async function onRequest({ request, env }) {
                 const checkRes = await fetch(checkUrl, {
                     headers: { 'Authorization': `Bearer ${env.AIRTABLE_API_KEY}` }
                 });
-                const checkData = await checkRes.json();
-                console.log("Records found for email:", checkData.records ? checkData.records.length : 0);
+                if (!checkRes.ok) {
+                    const errText = await checkRes.text().catch(() => '<no body>');
+                    console.error('Airtable check fetch failed:', checkRes.status, checkRes.statusText, checkUrl, errText);
+                } else {
+                    const checkData = await checkRes.json();
+                    console.log("Records found for email:", checkData.records ? checkData.records.length : 0);
 
-                if (checkData.records && checkData.records.length > 0) {
-                    // Find a record where Image_Upload has items AND Image_Upload2 is empty
-                    const pendingRecord = checkData.records.find(record => {
-                        const hasTestImages = record.fields.Image_Upload && record.fields.Image_Upload.length > 0;
-                        const hasPaidImages = record.fields.Image_Upload2 && record.fields.Image_Upload2.length > 0;
-                        return hasTestImages && !hasPaidImages;
-                    });
+                    if (checkData.records && checkData.records.length > 0) {
+                        // Find a record where Image_Upload has items AND Image_Upload2 is empty
+                        const pendingRecord = checkData.records.find(record => {
+                            const hasTestImages = record.fields.Image_Upload && record.fields.Image_Upload.length > 0;
+                            const hasPaidImages = record.fields.Image_Upload2 && record.fields.Image_Upload2.length > 0;
+                            return hasTestImages && !hasPaidImages;
+                        });
 
-                    if (pendingRecord) {
-                        pendingRecordId = pendingRecord.id;
-                        console.log("Found pending record ID via JS check:", pendingRecordId);
-                    } else {
-                        console.log("No pending record found via JS check.");
+                        if (pendingRecord) {
+                            pendingRecordId = pendingRecord.id;
+                            console.log("Found pending record ID via JS check:", pendingRecordId);
+                        } else {
+                            console.log("No pending record found via JS check.");
+                        }
                     }
                 }
             } catch (error) {

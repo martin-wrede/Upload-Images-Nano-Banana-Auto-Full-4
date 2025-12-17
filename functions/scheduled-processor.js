@@ -50,7 +50,13 @@ async function processNewRecords(env, baseUrl = null) {
         const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
 
         // Fetch records from Airtable (last 24 hours with Order_Package)
-        const airtableUrl = `https://api.airtable.com/v0/${env.AIRTABLE_BASE_ID1}/${env.AIRTABLE_TABLE_NAME1}`;
+        const baseId = env.AIRTABLE_BASE_ID1 || env.AIRTABLE_BASE_ID || env.AIRTABLE_BASE_ID2;
+        const tableNameRaw = env.AIRTABLE_TABLE_NAME1 || env.AIRTABLE_TABLE_NAME || env.AIRTABLE_TABLE_NAME2;
+        const tableName = encodeURIComponent(tableNameRaw || '');
+        if (!baseId || !tableNameRaw) {
+            console.warn('Airtable base/table env not set as expected.', { baseId, tableNameRaw });
+        }
+        const airtableUrl = `https://api.airtable.com/v0/${baseId}/${tableName}`;
 
         // Filter: Created in last 24h AND has Order_Package
         // We process images from BOTH Image_Upload and Image_Upload2 fields
@@ -70,7 +76,9 @@ async function processNewRecords(env, baseUrl = null) {
         });
 
         if (!response.ok) {
-            throw new Error(`Airtable fetch failed: ${response.status}`);
+            const text = await response.text().catch(() => '<no body>');
+            console.error('Airtable fetch failed:', response.status, response.statusText, fetchUrl, text);
+            throw new Error(`Airtable fetch failed: ${response.status} ${response.statusText}`);
         }
 
         const data = await response.json();
