@@ -19,7 +19,9 @@ export async function onRequest({ request, env }) {
     }
 
     try {
-        const { email } = await request.json();
+        const body = await request.json();
+        const email = body.email;
+        const folder = body.folder; // optional: 'base' | 'down' | 'all'
 
         if (!email) {
             return new Response(
@@ -40,34 +42,86 @@ export async function onRequest({ request, env }) {
 
         console.log(`📂 Listing images from folder: ${folderPrefix}`);
 
-        // List objects in R2 bucket with prefix
-        const listed = await env.IMAGE_BUCKET.list({
-            prefix: folderPrefix,
-            limit: 1000, // Adjust as needed
-        });
+        // Determine which prefixes to search based on optional 'folder' param (base/down/all)
+        let prefixes;
+        if (folder === 'base') {
+            prefixes = [`${safeEmail}/`];
+        } else if (folder === 'down') {
+            prefixes = [`${safeEmail}_down/`];
+        } else {
+            prefixes = [`${safeEmail}_down/`, `${safeEmail}/`, `${safeEmail}_`];
+        }
+        console.log(`🔎 Searching R2 with prefixes: ${prefixes.join(', ')} (requested folder: ${folder || 'all'})`);
 
-        // Filter for image files only
+        let allObjects = [];
+        for (const prefix of prefixes) {
+            try {
+                const listed = await env.IMAGE_BUCKET.list({
+                    prefix: prefix,
+                    limit: 1000,
+                });
+                if (listed.objects && listed.objects.length > 0) {
+                    allObjects = allObjects.concat(listed.objects);
+                }
+            } catch (err) {
+                console.warn(`⚠️ Error listing prefix ${prefix}:`, err);
+            }
+        }
+
+        // Deduplicate objects by key
+        const uniqueMap = new Map();
+        for (const obj of allObjects) {
+            uniqueMap.set(obj.key, obj);
+        }
+        const uniqueObjects = Array.from(uniqueMap.values());
+
+        // Filter for image files only, add upload timestamp, cache-busting param, then sort newest-first
         const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp'];
-        const images = listed.objects
+
+        const basePublicUrl = env.R2_PUBLIC_URL || 'https://pub-2e08632872a645f89f91aad5f2904c70.r2.dev';
+
+        const images = uniqueObjects
             .filter(obj => {
-                const ext = obj.key.toLowerCase().substring(obj.key.lastIndexOf('.'));
+                const idx = obj.key.lastIndexOf('.');
+                const ext = idx !== -1 ? obj.key.toLowerCase().substring(idx) : '';
                 return imageExtensions.includes(ext);
             })
-            .map(obj => ({
-                key: obj.key,
-                url: `${env.R2_PUBLIC_URL || 'https://pub-2e08632872a645f89f91aad5f2904c70.r2.dev'}/${obj.key}`,
-                filename: obj.key.split('/').pop(), // Get filename from key
-                size: obj.size,
-                uploaded: obj.uploaded,
-            }));
+            .map(obj => {
+                // derive a numeric timestamp for sorting & cache-busting
+                let uploadedAt = Date.now();
+                try {
+                    if (obj.uploaded) {
+                        // obj.uploaded may be a Date or string
+                        if (typeof obj.uploaded === 'string') uploadedAt = Date.parse(obj.uploaded) || uploadedAt;
+                        else if (obj.uploaded instanceof Date) uploadedAt = obj.uploaded.getTime();
+                        else if (typeof obj.uploaded === 'number') uploadedAt = obj.uploaded;
+                    }
+                } catch (e) {
+                    // ignore, use now
+                }
 
-        console.log(`✅ Found ${images.length} images in ${folderPrefix}`);
+                const filename = obj.key.split('/').pop(); // Get filename from key
+                const url = `${basePublicUrl}/${obj.key}?v=${uploadedAt}`;
+
+                return {
+                    key: obj.key,
+                    url,
+                    filename,
+                    size: obj.size,
+                    uploaded: obj.uploaded,
+                    uploadedAt
+                };
+            })
+            // sort newest first
+            .sort((a, b) => (b.uploadedAt || 0) - (a.uploadedAt || 0));
+
+        console.log(`✅ Found ${images.length} images across prefixes: ${prefixes.join(', ')}`);
 
         return new Response(
             JSON.stringify({
                 images: images,
                 count: images.length,
-                folder: folderPrefix
+                foldersChecked: prefixes
             }),
             {
                 status: 200,

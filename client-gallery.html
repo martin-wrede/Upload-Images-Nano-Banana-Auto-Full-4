@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Client Gallery — Minimal</title>
+  <style>
+    body { font-family: system-ui, -apple-system, 'Segoe UI', Roboto, Arial; max-width: 980px; margin: 24px auto; padding: 0 16px; color:#111 }
+    header { display:flex; gap:12px; align-items:center; margin-bottom:18px }
+    input[type=text] { padding:8px 10px; border:1px solid #ddd; border-radius:6px; min-width:260px }
+    button { background:#0b73ff; color:white; border:0; padding:8px 12px; border-radius:6px; cursor:pointer }
+    button.secondary{ background:#666 }
+    .hint { color:#666; font-size:0.9rem }
+    .info { margin:8px 0; color:#333 }
+    .gallery { display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:16px; margin-top: 18px }
+    .card { border:1px solid #eee; padding:10px; border-radius:8px; text-align:center }
+    img { max-width:100%; height:auto; border-radius:6px }
+    .meta { margin-top:8px; font-size:0.9rem }
+    .download { display:inline-block; margin-top:8px; padding:6px 10px; background:#2b7aee; color:white; border-radius:6px; text-decoration:none }
+    .error { color:#900; background:#fee; padding:8px; border-radius:6px }
+    .small { font-size:0.85rem; color:#666 }
+  </style>
+</head>
+<body>
+  <header>
+    <h2 style="margin:0">Client Gallery</h2>
+    <div class="hint">(minimal, read-only)</div>
+  </header>
+
+  <div>
+    <label for="email">Email:</label>
+    <input id="email" type="text" placeholder="e.g. martin_wrede@web.de" />
+    <button id="load">Load</button>
+    <button id="openAll" class="secondary">Open All</button>
+  </div>
+  <div class="info small">You can also pass parameters in the URL: <code>?email=...&api=https://upload-images-nano-banana-auto-full-7.pages.dev</code></div>
+
+  <div id="status" class="info"></div>
+  <div id="error" class="error" style="display:none"></div>
+
+  <div id="gallery" class="gallery" aria-live="polite"></div>
+
+  <script>
+    (function(){
+      const qs = new URLSearchParams(location.search);
+      const defaultApi = qs.get('api') || 'https://upload-images-nano-banana-auto-full-7.pages.dev';
+      const emailParam = qs.get('email') || '';
+
+      const emailInput = document.getElementById('email');
+      const loadBtn = document.getElementById('load');
+      const gallery = document.getElementById('gallery');
+      const status = document.getElementById('status');
+      const errorBox = document.getElementById('error');
+      const openAllBtn = document.getElementById('openAll');
+
+      let lastImages = [];
+      emailInput.value = emailParam;
+
+      function showError(msg){ errorBox.style.display='block'; errorBox.textContent = msg; }
+      function clearError(){ errorBox.style.display='none'; errorBox.textContent = ''; }
+      function setStatus(msg){ status.textContent = msg; }
+
+      async function loadFor(email){
+        clearError();
+        if(!email) { showError('Please enter an email'); return; }
+
+        setStatus('Loading images...');
+        gallery.innerHTML = '';
+
+        try {
+          const res = await fetch(defaultApi.replace(/\/+$/,'') + '/list-images', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, folder: 'base' })
+          });
+
+          if(!res.ok){
+            const txt = await res.text().catch(()=>'<no body>');
+            throw new Error('Server returned ' + res.status + ' ' + res.statusText + ' - ' + txt);
+          }
+
+          const data = await res.json();
+          const images = data.images || [];
+          lastImages = images;
+
+          if(images.length === 0){
+            setStatus('No images found for ' + email);
+            return;
+          }
+
+          setStatus('Found ' + images.length + ' images for ' + email);
+
+          images.forEach(img => {
+            const div = document.createElement('div'); div.className='card';
+            const im = document.createElement('img'); im.src = img.url; im.alt = img.filename || 'image';
+            div.appendChild(im);
+
+            const meta = document.createElement('div'); meta.className='meta';
+            meta.innerHTML = '<div>' + (img.filename || '') + '</div>' + '<div class="small">' + (img.size? (Math.round(img.size/1024) + ' KB') : '') + '</div>';
+            div.appendChild(meta);
+
+            const a = document.createElement('a'); a.className='download'; a.href = img.url; a.download = img.filename || '';
+            a.textContent = 'Download'; a.target = '_blank';
+            div.appendChild(a);
+
+            gallery.appendChild(div);
+          });
+
+        } catch (err){
+          console.error(err);
+          showError(err.message || 'Failed to load images');
+          setStatus('');
+        }
+      }
+
+      loadBtn.addEventListener('click', ()=> loadFor(emailInput.value.trim()));
+
+      openAllBtn.addEventListener('click', ()=>{
+        if(!lastImages.length){ showError('No images to open'); return; }
+        lastImages.forEach((img, idx) => {
+          // try to open each in a new tab/window
+          window.open(img.url, '_blank');
+        });
+      });
+
+      // Auto-load if email present in URL
+      if(emailParam){ loadFor(emailParam); }
+
+    })();
+  </script>
+</body>
+</html>
