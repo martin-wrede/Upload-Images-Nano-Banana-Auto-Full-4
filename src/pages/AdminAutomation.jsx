@@ -8,6 +8,8 @@ function AdminAutomation() {
         useDefaultPrompt: true,
         clientPrompt: 'If client did not provide a prompt, use this client-facing template to describe food photos',
         useClientPrompt: false,
+        useEmailTemplate: true,
+        emailTemplate: 'Hello {name},\n\nYour images are ready for download: {downloadLink}\n\nOrder/Package: {orderPackage}\n\nNotes: {prompt}\n\nBest regards,\nYour Studio',
         variationCount: 2,
         schedule: 6, // hours
     });
@@ -215,6 +217,41 @@ function AdminAutomation() {
                     </p>
                 </div>
 
+                {/* Email Template (new) */}
+                <div style={{ marginBottom: '1.5rem' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', marginBottom: '0.5rem' }}>
+                        <input
+                            type="checkbox"
+                            checked={config.useEmailTemplate}
+                            onChange={(e) => setConfig({ ...config, useEmailTemplate: e.target.checked })}
+                            style={{ width: '18px', height: '18px', marginRight: '0.5rem' }}
+                        />
+                        <strong>Use Email Template for Client Notification</strong>
+                    </label>
+                    <textarea
+                        value={config.emailTemplate}
+                        onChange={(e) => setConfig({ ...config, emailTemplate: e.target.value })}
+                        disabled={!config.useEmailTemplate}
+                        rows={6}
+                        style={{
+                            width: '100%',
+                            padding: '0.75rem',
+                            fontSize: '0.95rem',
+                            borderRadius: '4px',
+                            border: '1px solid #ccc',
+                            opacity: config.useEmailTemplate ? 1 : 0.5,
+                            backgroundColor: config.useEmailTemplate ? 'white' : '#f5f5f5',
+                            fontFamily: 'monospace'
+                        }}
+                        placeholder="Use placeholders: {name}, {downloadLink}, {orderPackage}, {prompt}"
+                    />
+                    <p style={{ fontSize: '0.85rem', color: '#666', marginTop: '0.5rem' }}>
+                        {config.useEmailTemplate
+                            ? '✅ Template will be used to prefill client emails after processing'
+                            : '⏭️ You can compose emails manually'}
+                    </p>
+                </div>
+
                 {/* Save Button */}
                 <button
                     onClick={saveConfig}
@@ -327,9 +364,34 @@ function AdminAutomation() {
                                             </div>
                                         )}
 
+                                        {/* helper function (inlined near component bottom) */}
+                                        
+
                                         {detail.downloadLink && (
                                             <div style={{ marginTop: '0.25rem', fontSize: '0.8rem' }}>
                                                 🔗 <a href={detail.downloadLink} target="_blank" rel="noopener noreferrer">{detail.downloadLink}</a>
+
+                                                {/* Compose Email Button */}
+                                                {detail.email && (
+                                                    <div style={{ marginTop: '0.25rem' }}>
+                                                        <a
+                                                            href={composeMailto(detail)}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            onClick={(e) => { /* noop, link opens mail client */ }}
+                                                            style={{
+                                                                display: 'inline-block',
+                                                                marginTop: '0.25rem',
+                                                                padding: '0.35rem 0.6rem',
+                                                                backgroundColor: '#1976D2',
+                                                                color: 'white',
+                                                                borderRadius: '4px',
+                                                                textDecoration: 'none',
+                                                                fontSize: '0.85rem'
+                                                            }}
+                                                        >✉️ Compose Email</a>
+                                                    </div>
+                                                )}
                                             </div>
                                         )}
                                     </div>
@@ -367,6 +429,24 @@ function AdminAutomation() {
             </div>
         </div>
     );
-}
+
+    // Compose a mailto URL using template or default body
+    function composeMailto(detail) {
+        const recipient = detail.email || '';
+        const name = detail.user || detail.email || '';
+        const tpl = config.useEmailTemplate ? config.emailTemplate : '';
+
+        const template = tpl && tpl.trim() !== '' ? tpl : 'Hello {name},\n\nYour images are ready for download: {downloadLink}\n\nOrder/Package: {orderPackage}\n\nNotes: {prompt}\n\nBest regards,\nYour Studio';
+
+        const body = template
+            .replace(/\{name\}/g, name)
+            .replace(/\{downloadLink\}/g, detail.downloadLink || '')
+            .replace(/\{orderPackage\}/g, detail.orderPackage || '')
+            .replace(/\{prompt\}/g, detail.promptUsed || '');
+
+        const subject = `Your images are ready — ${detail.orderPackage || 'Download'}`;
+
+        return `mailto:${encodeURIComponent(recipient)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    }
 
 export default AdminAutomation;

@@ -246,6 +246,8 @@ async function processNewRecords(env, baseUrl = null, overrides = {}) {
                 results.details.push({
                     recordId,
                     email: fields.Email,
+                    user: fields.User || '',
+                    orderPackage: fields.Order_Package || '',
                     imagesProcessed: allImages.length,
                     status: 'success',
                     promptUsed: finalPrompt,
