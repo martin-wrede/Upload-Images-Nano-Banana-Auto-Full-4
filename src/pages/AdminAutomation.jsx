@@ -6,6 +6,8 @@ function AdminAutomation() {
         enabled: false,
         defaultPrompt: 'Professional food photography, high quality, well-lit, appetizing presentation, restaurant quality',
         useDefaultPrompt: true,
+        clientPrompt: 'If client did not provide a prompt, use this client-facing template to describe food photos',
+        useClientPrompt: false,
         variationCount: 2,
         schedule: 6, // hours
     });
@@ -42,8 +44,19 @@ function AdminAutomation() {
         setProcessingResults(null);
 
         try {
+            // Send config overrides with manual trigger so admin UI controls are respected
+            const body = {
+                defaultPrompt: config.defaultPrompt,
+                useDefaultPrompt: config.useDefaultPrompt,
+                clientPrompt: config.clientPrompt,
+                useClientPrompt: config.useClientPrompt,
+                variationCount: config.variationCount
+            };
+
             const response = await fetch('/scheduled-processor', {
                 method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body),
             });
 
             if (!response.ok) {
@@ -168,6 +181,40 @@ function AdminAutomation() {
                     </p>
                 </div>
 
+                {/* Client Prompt (new) */}
+                <div style={{ marginBottom: '1.5rem' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', marginBottom: '0.5rem' }}>
+                        <input
+                            type="checkbox"
+                            checked={config.useClientPrompt}
+                            onChange={(e) => setConfig({ ...config, useClientPrompt: e.target.checked })}
+                            style={{ width: '18px', height: '18px', marginRight: '0.5rem' }}
+                        />
+                        <strong>Use Client Prompt Template</strong>
+                    </label>
+                    <textarea
+                        value={config.clientPrompt}
+                        onChange={(e) => setConfig({ ...config, clientPrompt: e.target.value })}
+                        disabled={!config.useClientPrompt}
+                        rows={3}
+                        style={{
+                            width: '100%',
+                            padding: '0.75rem',
+                            fontSize: '0.95rem',
+                            borderRadius: '4px',
+                            border: '1px solid #ccc',
+                            opacity: config.useClientPrompt ? 1 : 0.5,
+                            backgroundColor: config.useClientPrompt ? 'white' : '#f5f5f5'
+                        }}
+                        placeholder="Enter client prompt template (applied per client if enabled)..."
+                    />
+                    <p style={{ fontSize: '0.85rem', color: '#666', marginTop: '0.5rem' }}>
+                        {config.useClientPrompt
+                            ? '✅ This client template will be included when processing each record'
+                            : '⏭️ Client-specific prompts (from Airtable) will be used as provided'}
+                    </p>
+                </div>
+
                 {/* Save Button */}
                 <button
                     onClick={saveConfig}
@@ -272,6 +319,14 @@ function AdminAutomation() {
                                                 : `❌ ${detail.reason || 'Processing failed'}`
                                             }
                                         </div>
+
+                                        {/* Show the prompt used for transparency */}
+                                        {detail.promptUsed && (
+                                            <div style={{ fontSize: '0.85rem', color: '#444', marginTop: '0.25rem' }}>
+                                                <strong>Prompt used:</strong> {detail.promptUsed}
+                                            </div>
+                                        )}
+
                                         {detail.downloadLink && (
                                             <div style={{ marginTop: '0.25rem', fontSize: '0.8rem' }}>
                                                 🔗 <a href={detail.downloadLink} target="_blank" rel="noopener noreferrer">{detail.downloadLink}</a>

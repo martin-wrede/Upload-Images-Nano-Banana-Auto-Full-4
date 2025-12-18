@@ -6,7 +6,16 @@ export async function onRequest({ request, env }) {
     if (request.method === "POST") {
         const url = new URL(request.url);
         const baseUrl = url.origin;
-        return await processNewRecords(env, baseUrl);
+
+        // Accept optional JSON body to override prompts and behavior for manual runs
+        let overrides = {};
+        try {
+            overrides = await request.json();
+        } catch (e) {
+            overrides = {};
+        }
+
+        return await processNewRecords(env, baseUrl, overrides);
     }
 
     return new Response("Scheduled processor endpoint. Use POST to manually trigger.", {
@@ -28,7 +37,7 @@ export async function scheduled(event, env, ctx) {
     ctx.waitUntil(processNewRecords(env));
 }
 
-async function processNewRecords(env, baseUrl = null) {
+async function processNewRecords(env, baseUrl = null, overrides = {}) {
     const startTime = Date.now();
     // Determine the worker URL (dynamic origin > env var > default)
     const workerUrl = baseUrl || env.WORKER_URL || 'https://upload-images-nano-banana-auto.pages.dev';
@@ -45,6 +54,29 @@ async function processNewRecords(env, baseUrl = null) {
 
     try {
         console.log('📡 Fetching new records from Airtable...');
+
+        // Get default settings (from env) and allow overrides from manual call
+    
+        let defaultPrompt = env.DEFAULT_FOOD_PROMPT ||
+            '„Ein professionelles Food-Fotografie-Bild::  Kamera-Perspektive: leicht erhöhte Draufsicht, etwa 30–45° von oben. Objektiv: Normalobjektiv, 50 mm Vollformat-Look. Den Teller oder Gefäß vervollständigen, Hintergrund sanft unscharf (Bokeh). Komposition klar und appetitlich, alle Speisen vollständig sichtbar. Keine störenden Objekte wie Dosen, Serviettenhalter oder Salzstreuer im Bild. Beleuchtung: weiches, diffuses Licht wie aus einer großen Lichtwanne, natürliche Reflexe, zarte Schatten. Farben lebendig, aber realistisch; leichte Food-Styling-Ästhetik; knackige Details, hohe Schärfe, professioneller Look. Ultra-realistischer Stil, hochwertige Food-Photography.“';
+        let variationCount = parseInt(env.DEFAULT_VARIATION_COUNT || '2');
+        let useDefaultPrompt = env.USE_DEFAULT_PROMPT !== 'false';
+
+        // Client prompt defaults (env optional)
+        let clientPrompt = env.DEFAULT_CLIENT_PROMPT || '';
+        let useClientPrompt = env.USE_CLIENT_PROMPT !== 'false';
+
+        // Apply overrides from POST body (manual trigger)
+        if (overrides) {
+            if (typeof overrides.defaultPrompt === 'string') defaultPrompt = overrides.defaultPrompt;
+            if (typeof overrides.useDefaultPrompt === 'boolean') useDefaultPrompt = overrides.useDefaultPrompt;
+            if (typeof overrides.clientPrompt === 'string') clientPrompt = overrides.clientPrompt;
+            if (typeof overrides.useClientPrompt === 'boolean') useClientPrompt = overrides.useClientPrompt;
+            if (typeof overrides.variationCount !== 'undefined') variationCount = parseInt(overrides.variationCount) || variationCount;
+        }
+
+        console.log('🔧 Settings - useDefault:', useDefaultPrompt, 'useClient:', useClientPrompt, 'variationCount:', variationCount);
+
 
         // Calculate timestamp for 24 hours ago
         const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
@@ -87,11 +119,6 @@ async function processNewRecords(env, baseUrl = null) {
             });
         }
 
-        // Get default settings
-        const defaultPrompt = env.DEFAULT_FOOD_PROMPT ||
-            '„Ein professionelles Food-Fotografie-Bild::  Kamera-Perspektive: leicht erhöhte Draufsicht, etwa 30–45° von oben. Objektiv: Normalobjektiv, 50 mm Vollformat-Look. Den Teller oder Gefäß vervollständigen, Hintergrund sanft unscharf (Bokeh). Komposition klar und appetitlich, alle Speisen vollständig sichtbar. Keine störenden Objekte wie Dosen, Serviettenhalter oder Salzstreuer im Bild. Beleuchtung: weiches, diffuses Licht wie aus einer großen Lichtwanne, natürliche Reflexe, zarte Schatten. Farben lebendig, aber realistisch; leichte Food-Styling-Ästhetik; knackige Details, hohe Schärfe, professioneller Look. Ultra-realistischer Stil, hochwertige Food-Photography.“';
-        const variationCount = parseInt(env.DEFAULT_VARIATION_COUNT || '2');
-        const useDefaultPrompt = env.USE_DEFAULT_PROMPT !== 'false';
 
         // Process each record
         for (const record of records) {
@@ -115,13 +142,18 @@ async function processNewRecords(env, baseUrl = null) {
 
                 results.recordsProcessed++;
 
-                // Combine prompts
+                // Combine prompts: default -> client template -> record-specific
                 let finalPrompt = fields.Prompt || '';
+
+                if (useClientPrompt && clientPrompt) {
+                    finalPrompt = clientPrompt + (finalPrompt ? '. ' + finalPrompt : '');
+                }
+
                 if (useDefaultPrompt && defaultPrompt) {
                     finalPrompt = defaultPrompt + (finalPrompt ? '. ' + finalPrompt : '');
                 }
 
-                console.log(`📝 Using prompt: "${finalPrompt}"`);
+                console.log(`📝 Using prompt (combined): "${finalPrompt}"`);
 
                 // Generate App Link for download (define here for scope)
                 const safeEmail = fields.Email ? fields.Email.replace(/[^a-zA-Z0-9]/g, '_') : '';
@@ -216,6 +248,7 @@ async function processNewRecords(env, baseUrl = null) {
                     email: fields.Email,
                     imagesProcessed: allImages.length,
                     status: 'success',
+                    promptUsed: finalPrompt,
                     downloadLink: downloadLink // Add link to response for debugging
                 });
 
