@@ -448,5 +448,6 @@ function AdminAutomation() {
 
         return `mailto:${encodeURIComponent(recipient)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
     }
+}
 
     export default AdminAutomation;
