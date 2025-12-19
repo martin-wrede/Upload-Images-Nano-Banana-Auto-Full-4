@@ -156,8 +156,13 @@ async function processNewRecords(env, baseUrl = null, overrides = {}) {
                 console.log(`📝 Using prompt (combined): "${finalPrompt}"`);
 
                 // Generate App Link for download (define here for scope)
-                const safeEmail = fields.Email ? fields.Email.replace(/[^a-zA-Z0-9]/g, '_') : '';
-                const downloadLink = `${workerUrl}/?email=${fields.Email}`;
+                // Sanitize and URL-encode the email if present; omit the query param when missing
+                const safeEmail = fields.Email ? fields.Email.replace(/[^a-zA-Z0-9@._+\-]/g, '_') : '';
+                const downloadLink = fields.Email && fields.Email !== 'undefined'
+                    ? `${workerUrl}/?email=${encodeURIComponent(fields.Email)}`
+                    : `${workerUrl}/`;
+
+                if (!fields.Email) console.log(`ℹ️ No email found for record ${recordId}; download link will not include email`);
 
                 // Process each image
                 for (let i = 0; i < allImages.length; i++) {
