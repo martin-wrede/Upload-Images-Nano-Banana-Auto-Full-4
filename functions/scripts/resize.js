@@ -64,7 +64,9 @@ const SRC_ROOT = path.resolve(__dirname, '../../_down');
 
         try {
           await sharp(srcFile)
-            .resize({ width: w, withoutEnlargement: true })
+            // Resize to fit within a bounding box of w x w (e.g. 1920x1920)
+            // This ensures landscape is max 1920 wide, and portrait is max 1920 high
+            .resize({ width: w, height: w, fit: 'inside', withoutEnlargement: true })
             .jpeg({ quality: 80 })
             .toFile(outPath);
         } catch (err) {
